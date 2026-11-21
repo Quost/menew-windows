@@ -27,7 +27,7 @@ No telemetry, no analytics, no account, and today **no network request at all**.
 
 ## Building
 
-Needs Windows 10 1809 or later, the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, for a Native AOT build, the "Desktop development with C++" workload of Visual Studio.
+Runs on Windows 10 2004 (build 19041) or later and Windows 11. Building needs the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, for a Native AOT build, the "Desktop development with C++" workload of Visual Studio.
 
 ```powershell
 dotnet build src/Menew.App -p:Platform=x64
