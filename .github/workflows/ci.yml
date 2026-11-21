@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet test tests/Menew.Core.Tests
+
+  app:
+    name: App (Windows, ${{ matrix.platform }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Core tests
+        if: matrix.platform == 'x64'
+        run: dotnet test tests/Menew.Core.Tests
+      - name: Build
+        run: dotnet build src/Menew.App -c Release -p:Platform=${{ matrix.platform }}
+      - name: Publish (Native AOT)
+        if: matrix.platform == 'x64'
+        run: dotnet publish src/Menew.App -c Release -r win-x64 -p:Platform=x64 -o publish
+      - name: Smoke test
+        if: matrix.platform == 'x64'
+        shell: pwsh
+        run: |
+          # the app must start and stay up (tray app, no window); a crash at start fails the job
+          $p = Start-Process -FilePath publish\Menew.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { Write-Error "Menew exited at start with code $($p.ExitCode)"; exit 1 }
+          Stop-Process -Id $p.Id
+          Get-ChildItem publish | Measure-Object -Property Length -Sum | ForEach-Object { "publish size: {0:N1} MB" -f ($_.Sum / 1MB) }
+      - uses: actions/upload-artifact@v7
+        if: matrix.platform == 'x64'
+        with:
+          name: menew-windows-x64
+          path: publish

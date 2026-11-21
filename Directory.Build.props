@@ -1,0 +1,15 @@
+<Project>
+  <!-- Shared by every project. Menew for Windows: C# + WinUI 3, see CLAUDE.md. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <Authors>Matheus Quost</Authors>
+    <Product>Menew</Product>
+    <Copyright>Copyright (C) 2026 Matheus Quost. GPL-3.0-only.</Copyright>
+    <Version>0.0.1</Version>
+  </PropertyGroup>
+</Project>
