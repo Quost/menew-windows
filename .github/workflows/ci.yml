@@ -39,6 +39,12 @@ jobs:
       - name: Publish (Native AOT)
         if: matrix.platform == 'x64'
         run: dotnet publish src/Menew.App -c Release -r win-x64 -p:Platform=x64 -o publish
+      - name: Verify XAML resources
+        if: matrix.platform == 'x64'
+        shell: pwsh
+        run: |
+          if (-not (Get-ChildItem publish -Recurse -Filter *.xbf)) { throw 'The published app is missing compiled XAML (.xbf) resources.' }
+          if (-not (Test-Path publish\Menew.pri)) { throw 'The published app is missing Menew.pri.' }
       - name: Smoke test
         if: matrix.platform == 'x64'
         shell: pwsh
