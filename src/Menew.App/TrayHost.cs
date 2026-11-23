@@ -13,7 +13,7 @@ internal sealed unsafe class TrayHost : IDisposable
 {
     private const uint CallbackMessage = Native.WM_APP + 1;
     private const int HotkeyPalette = 1;
-    private const int MenuOpen = 1, MenuQuit = 2;
+    private const int MenuOpen = 1, MenuQuit = 2, MenuCheckUpdates = 3, MenuAutoUpdate = 4, MenuInstallUpdate = 5;
 
     private static TrayHost? _current;
     private static char* _className;
@@ -23,14 +23,16 @@ internal sealed unsafe class TrayHost : IDisposable
     private readonly uint _taskbarCreated;
     private readonly Action _openPalette;
     private readonly Action _quit;
+    private readonly Updater? _updater;
     private bool _added;
 
     public bool HotkeyRegistered { get; private set; }
 
-    public TrayHost(string iconPath, Action openPalette, Action quit)
+    public TrayHost(string iconPath, Action openPalette, Action quit, Updater? updater = null)
     {
         _openPalette = openPalette;
         _quit = quit;
+        _updater = updater;
         _current = this;
         _taskbarCreated = Native.RegisterWindowMessage("TaskbarCreated");
         var instance = Native.GetModuleHandle(null);
@@ -86,6 +88,17 @@ internal sealed unsafe class TrayHost : IDisposable
         var menu = Native.CreatePopupMenu();
         Native.AppendMenu(menu, Native.MF_STRING, MenuOpen, Strings.L("tray_open_palette") + "\tCtrl+Alt+Space");
         Native.AppendMenu(menu, Native.MF_SEPARATOR, 0, null);
+        // updates (Updater.cs): only in an installed Release build
+        if (_updater is { Available: true } updater)
+        {
+            if (updater.ReadyVersion is { } ready)
+            {
+                Native.AppendMenu(menu, Native.MF_STRING, MenuInstallUpdate, Strings.L("upd_install_version", ready));
+            }
+            Native.AppendMenu(menu, Native.MF_STRING, MenuCheckUpdates, Strings.L("upd_check"));
+            Native.AppendMenu(menu, updater.AutoCheck ? Native.MF_CHECKED : Native.MF_STRING, MenuAutoUpdate, Strings.L("upd_auto"));
+            Native.AppendMenu(menu, Native.MF_SEPARATOR, 0, null);
+        }
         Native.AppendMenu(menu, Native.MF_STRING, MenuQuit, Strings.L("tray_quit"));
         Native.GetCursorPos(out var pt);
         // the menu closes when clicking elsewhere only if our window is in front (KB135788)
@@ -95,6 +108,9 @@ internal sealed unsafe class TrayHost : IDisposable
         Native.DestroyMenu(menu);
         if (cmd == MenuOpen) _openPalette();
         else if (cmd == MenuQuit) _quit();
+        else if (cmd == MenuCheckUpdates) _ = _updater?.CheckAsync(manual: true);
+        else if (cmd == MenuAutoUpdate && _updater is not null) _updater.AutoCheck = !_updater.AutoCheck;
+        else if (cmd == MenuInstallUpdate) _updater?.InstallAndRestart();
     }
 
     private nint Handle(uint msg, nint wParam, nint lParam)

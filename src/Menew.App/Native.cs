@@ -26,7 +26,7 @@ internal static unsafe partial class Native
     public const uint NIF_MESSAGE = 0x1, NIF_ICON = 0x2, NIF_TIP = 0x4, NIF_INFO = 0x10, NIF_SHOWTIP = 0x80;
     public const uint NIIF_INFO = 0x1, NIIF_NOSOUND = 0x10;
 
-    public const uint MF_STRING = 0x0, MF_SEPARATOR = 0x800;
+    public const uint MF_STRING = 0x0, MF_CHECKED = 0x8, MF_SEPARATOR = 0x800;
     public const uint TPM_RIGHTBUTTON = 0x2, TPM_RETURNCMD = 0x100, TPM_BOTTOMALIGN = 0x20;
 
     public const uint IMAGE_ICON = 1;

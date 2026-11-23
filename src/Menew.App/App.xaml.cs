@@ -12,6 +12,7 @@ public partial class App : Application
 {
     private PaletteWindow? _palette;
     private TrayHost? _tray;
+    private Updater? _updater;
 
     public App()
     {
@@ -21,14 +22,17 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Languages.Current = Languages.Detect();
+        _updater = new Updater(text => _tray?.Notify("Menew", text), RemoveTrayIcon);
+        if (_updater.ApplyPendingAtStart()) return;
         _palette = new PaletteWindow();
         var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Menew.ico");
-        _tray = new TrayHost(icon, () => _palette.Toggle(), Quit);
+        _tray = new TrayHost(icon, () => _palette.Toggle(), Quit, _updater);
         if (!_tray.HotkeyRegistered)
         {
             _tray.Notify("Menew", Strings.L("hotkey_taken"));
         }
         LoadApps();
+        _updater.Start();
     }
 
     /// <summary>A second launch of Menew.exe (Program.cs) opens the palette in this one.</summary>
@@ -45,10 +49,16 @@ public partial class App : Application
         });
     }
 
-    private void Quit()
+    private void RemoveTrayIcon()
     {
         _tray?.Dispose();
         _tray = null;
+    }
+
+    private void Quit()
+    {
+        RemoveTrayIcon();
+        _updater?.Dispose();
         Exit();
     }
 }

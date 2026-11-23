@@ -1,6 +1,7 @@
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using Velopack;
 
 namespace Menew;
 
@@ -15,6 +16,9 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // first thing: Velopack's install/update/uninstall hooks run here and exit. Downloaded updates are
+        // applied by Updater.ApplyPendingAtStart in the running copy, not here (a second launch only hands over)
+        VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var instance = AppInstance.FindOrRegisterForKey(InstanceKey);
         if (!instance.IsCurrent)
