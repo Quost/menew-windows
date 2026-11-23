@@ -28,6 +28,10 @@ docker run --rm -v "$PWD:/src" -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet 
 
 On Windows: `dotnet build src/Menew.App -p:Platform=x64` and run `src/Menew.App/bin/x64/Debug/net10.0-windows10.0.19041.0/win-x64/Menew.exe`; release build: `dotnet publish src/Menew.App -c Release -r win-x64` (Native AOT). Nothing that needs a real Windows desktop (hotkey, tray, focus, clipboard) is verified until someone runs it on Windows: say so in PRs.
 
+## Releases
+
+Fully automatic (README "Releasing"): release-please keeps a `chore(release): X.Y.Z` PR open; merging it tags and `release.yml` builds, packs with Velopack (`scripts/package.ps1`), publishes and updates winget. Never edit `<Version>` in `Directory.Build.props`, the version sections of `CHANGELOG.md` or tags by hand. Release asset names are a contract with the website and the updater (README "Release assets"): don't rename them. Pin every action by full commit SHA with the version in a comment.
+
 ## When a change is visible to users
 
 Update in the same change: `Strings.cs` (5 languages), `docs/parity.md`, `README.md` (features, shortcuts, privacy) and `CHANGELOG.md` (`## Unreleased`, for users, in English).

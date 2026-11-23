@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # actions are pinned by commit SHA; Dependabot bumps the SHA and the version comment together
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # what ships in the app: "fix(deps)" so release-please makes a patch release with it. Velopack: CI and the
+  # Release workflow install the vpk of the same version (scripts/package.ps1)
+  - package-ecosystem: nuget
+    directories: ["/src/Menew.App", "/src/Menew.Core"]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      include: scope
+
+  # test-only packages: no release
+  - package-ecosystem: nuget
+    directory: /tests/Menew.Core.Tests
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      test:
+        patterns: ["*"]

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "skip-changelog": true,
+  "draft": true,
+  "force-tag-creation": true,
+  "always-update": true,
+  "pull-request-title-pattern": "chore(release): ${version}",
+  "pull-request-header": "Merging this PR releases Menew for Windows: the Release workflow builds, packs and publishes it, then updates winget. The Unreleased notes of CHANGELOG.md become this version's section, which is the text of the GitHub release and of the update (edit it in this PR if needed).",
+  "packages": {
+    ".": {
+      "package-name": "menew-windows",
+      "extra-files": [
+        {
+          "type": "xml",
+          "path": "Directory.Build.props",
+          "xpath": "//Project/PropertyGroup/Version"
+        }
+      ]
+    }
+  }
+}
