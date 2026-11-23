@@ -1,0 +1,27 @@
+name: Site content
+
+# The /windows page of https://menew.pururucos.com.br is built by Quost/menew-site from site/ here.
+# That repo polls this one every 30 minutes, so nothing has to be sent from here; this only checks the content
+# with menew-site's validator (5 languages, same keys, required keys, allowed HTML).
+on:
+  pull_request:
+    paths: ["site/**", ".github/workflows/site-content.yml"]
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/site-content.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate site content
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: Quost/menew-site
+          path: .menew-site
+          persist-credentials: false
+      - run: python3 .menew-site/scripts/content.py windows site
