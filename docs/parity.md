@@ -112,7 +112,7 @@ Status: ✅ done · 🟡 partial · ⬜ to port · 🔁 port with a different te
 | Settings, welcome tour | ✅ | ⬜ | R1 | |
 | 5 languages, follow system or pick | ✅ | 🟡 | R1 | `Strings.cs` in 5 languages, follows the Windows display language; no picker yet. |
 | Start at login | ✅ | ⬜ | R1 | `HKCU\...\Run` (opt-in, like Linux). |
-| Updates | ✅ | ⬜ | R1 | Signed releases on GitHub, then winget. |
+| Updates | ✅ | 🟡 | R1 | Velopack (`Updater.cs`): GitHub releases checked 5 min after start and daily (like Linux), background download with deltas, installed on the next start or from the tray ("Install Menew X and Relaunch"), Check for Updates and an automatic-check toggle in the tray. Releases fully automatic (release-please, `release.yml`, winget). Unlike Mac and Linux: no update window with the notes and no Skip This Version yet, and builds are not code-signed yet (Velopack checks the SHA-256 of the packages from the feed; no separate signing key like Sparkle or Linux). Not run on a real install against a real release yet. |
 | Liquid Glass design | ✅ | 🔁 | | Acrylic on the palette, Mica on windows: the Windows 11 materials. |
 | Live notch, widgets, Siri/Shortcuts, Continuity Camera | ✅ | ❌ | | No equivalent; Windows widgets could come later. |
 | Backup / restore | ✅ | ⬜ | | |

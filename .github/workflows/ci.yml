@@ -1,23 +1,55 @@
 name: CI
 
+# Job names are stable on purpose: they are the required checks of the branch protection.
 on:
   push:
     branches: [main]
   pull_request:
+  # release-please.yml starts this on its release PR: a PR opened with GITHUB_TOKEN triggers no workflow by itself
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   core:
     name: Core tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
       - run: dotnet test tests/Menew.Core.Tests
+
+  workflows:
+    name: Workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl -fsSLo actionlint.tgz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tgz" | sha256sum -c -
+          tar xzf actionlint.tgz actionlint
+          ./actionlint -color
+      - name: Every action is pinned by a full commit SHA
+        run: |
+          if grep -RnE '^\s*-?\s*uses:\s*[^./][^@]*@' .github/workflows | grep -vE '@[0-9a-f]{40}( |$)'; then
+            echo "::error::pin these actions by their full commit SHA, with the version in a comment"
+            exit 1
+          fi
 
   app:
     name: App (Windows, ${{ matrix.platform }})
@@ -25,38 +57,42 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [x64, ARM64]
+        include:
+          - platform: x64
+            rid: win-x64
+          - platform: ARM64
+            rid: win-arm64
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
       - name: Core tests
         if: matrix.platform == 'x64'
         run: dotnet test tests/Menew.Core.Tests
-      - name: Build
-        run: dotnet build src/Menew.App -c Release -p:Platform=${{ matrix.platform }}
-      - name: Publish (Native AOT)
-        if: matrix.platform == 'x64'
-        run: dotnet publish src/Menew.App -c Release -r win-x64 -p:Platform=x64 -o publish
-      - name: Verify XAML resources
-        if: matrix.platform == 'x64'
+      - name: Build (Debug)
+        run: dotnet build src/Menew.App -c Debug -p:Platform=${{ matrix.platform }}
+      # the same script as the Release workflow: Native AOT publish, XAML resource checks, Velopack pack
+      - name: Publish and pack (Native AOT, Velopack)
         shell: pwsh
-        run: |
-          if (-not (Get-ChildItem publish -Recurse -Filter *.xbf)) { throw 'The published app is missing compiled XAML (.xbf) resources.' }
-          if (-not (Test-Path publish\Menew.pri)) { throw 'The published app is missing Menew.pri.' }
+        run: ./scripts/package.ps1 -Rid ${{ matrix.rid }}
       - name: Smoke test
+        # an ARM64 build cannot run on the x64 runner
         if: matrix.platform == 'x64'
         shell: pwsh
         run: |
           # the app must start and stay up (tray app, no window); a crash at start fails the job
-          $p = Start-Process -FilePath publish\Menew.exe -PassThru
+          $p = Start-Process -FilePath artifacts\publish\win-x64\Menew.exe -PassThru
           Start-Sleep -Seconds 8
           if ($p.HasExited) { Write-Error "Menew exited at start with code $($p.ExitCode)"; exit 1 }
           Stop-Process -Id $p.Id
-          Get-ChildItem publish | Measure-Object -Property Length -Sum | ForEach-Object { "publish size: {0:N1} MB" -f ($_.Sum / 1MB) }
-      - uses: actions/upload-artifact@v7
-        if: matrix.platform == 'x64'
+          Get-ChildItem artifacts\publish\win-x64 | Measure-Object -Property Length -Sum | ForEach-Object { "publish size: {0:N1} MB" -f ($_.Sum / 1MB) }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: menew-windows-x64
-          path: publish
+          name: menew-${{ matrix.rid }}
+          path: |
+            artifacts/releases/Menew-${{ matrix.rid }}-Setup.exe
+            artifacts/releases/Menew-${{ matrix.rid }}-Portable.zip
+          retention-days: 14
