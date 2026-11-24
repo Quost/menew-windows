@@ -29,6 +29,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write # release-please creates and moves the "autorelease: pending/tagged" labels
     outputs:
       release_created: ${{ steps.rp.outputs.release_created }}
       tag_name: ${{ steps.rp.outputs.tag_name }}
