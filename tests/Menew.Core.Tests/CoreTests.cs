@@ -69,6 +69,28 @@ public class CalculatorTests
     [InlineData("sqrt")]
     public void InvalidInputNeverThrows(string q) => Assert.Null(Ev(q));
 
+    [Fact]
+    public void PastedOrDeeplyNestedInputIsRejectedWithoutOverflowingTheStack()
+    {
+        // Too long: rejected before parsing.
+        Assert.Null(Ev(new string('(', 100_000)));
+        Assert.Null(Ev(new string('-', 100_000) + "1"));
+        Assert.Null(Ev("1+" + string.Concat(Enumerable.Repeat("1+", 300)) + "1"));
+        // Short enough, but nested past the parser's depth limit.
+        Assert.Null(Ev(new string('(', 250) + "1" + new string(')', 250)));
+        Assert.Null(Ev(new string('-', 400) + "1"));
+        Assert.Null(Ev(string.Concat(Enumerable.Repeat("1^", 150)) + "1"));
+        Assert.Null(Ev(new string('√', 300) + "1"));
+    }
+
+    [Fact]
+    public void DeepButReasonableNestingStillWorks()
+    {
+        Assert.Equal("2", Ev(new string('(', 50) + "1+1" + new string(')', 50)));
+        Assert.Equal("1", Ev(new string('-', 100) + "1"));
+        Assert.Equal("1", Ev(string.Concat(Enumerable.Repeat("1^", 40)) + "1"));
+    }
+
     [Theory]
     [InlineData(1e20, "1e+20")]
     [InlineData(1.5e-12, "1.5e-12")]

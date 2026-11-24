@@ -28,11 +28,14 @@ public static class Calculator
         ("round", v => Math.Round(v, MidpointRounding.AwayFromZero)),
     ];
 
+    /// <summary>Longer input is not a calculation: keeps a pasted wall of text from going through the parser.</summary>
+    private const int MaxLength = 512;
+
     /// <summary><c>null</c> when the text is not a calculation (a lone number is not one either).</summary>
     public static CalcResult? Evaluate(string raw, Language lang)
     {
         var q = raw.Trim().ToLowerInvariant();
-        if (q.Length == 0) return null;
+        if (q.Length == 0 || q.Length > MaxLength) return null;
         if (PercentOf(q, lang) is { } p) return p;
         var hasOp = q.Any(c => "+-*/^x×÷%()√!".Contains(c));
         var hasFn = Functions.Any(f => q.Contains(f.Name, StringComparison.Ordinal)) || q.Contains("pi", StringComparison.Ordinal) || q.Contains('π');
@@ -66,8 +69,15 @@ public static class Calculator
     /// <summary>expr = term (+|- term)* · term = power (*|/ power)* · power = unary (^ power)?</summary>
     private sealed class Parser(string s)
     {
+        /// <summary>
+        /// Nesting limit for the recursive rules ("(", unary signs, "^", functions). A stack overflow cannot be
+        /// caught in .NET, so deeper input is rejected (null) instead.
+        /// </summary>
+        private const int MaxDepth = 200;
+
         private readonly string _c = s.Replace(" ", "", StringComparison.Ordinal);
         private int _i;
+        private int _depth;
 
         private char? Peek => _i < _c.Length ? _c[_i] : null;
 
@@ -123,29 +133,39 @@ public static class Calculator
 
         private double? Power()
         {
-            if (Unary() is not { } b) return null;
-            if (Peek == '^')
+            if (++_depth > MaxDepth) return null;
+            try
             {
-                _i++;
-                if (Power() is not { } e) return null;
-                return Math.Pow(b, e);
+                if (Unary() is not { } b) return null;
+                if (Peek == '^')
+                {
+                    _i++;
+                    if (Power() is not { } e) return null;
+                    return Math.Pow(b, e);
+                }
+                return b;
             }
-            return b;
+            finally { _depth--; }
         }
 
         private double? Unary()
         {
-            switch (Peek)
+            if (++_depth > MaxDepth) return null;
+            try
             {
-                case '-':
-                    _i++;
-                    return -Unary();
-                case '+':
-                    _i++;
-                    return Unary();
-                default:
-                    return Postfix();
+                switch (Peek)
+                {
+                    case '-':
+                        _i++;
+                        return -Unary();
+                    case '+':
+                        _i++;
+                        return Unary();
+                    default:
+                        return Postfix();
+                }
             }
+            finally { _depth--; }
         }
 
         private double? Postfix()
@@ -173,6 +193,13 @@ public static class Calculator
         }
 
         private double? Primary()
+        {
+            if (++_depth > MaxDepth) return null;
+            try { return PrimaryCore(); }
+            finally { _depth--; }
+        }
+
+        private double? PrimaryCore()
         {
             if (Peek is not { } c) return null;
             if (c == '(')
