@@ -79,7 +79,7 @@ public class CalculatorTests
         // Short enough, but nested past the parser's depth limit.
         Assert.Null(Ev(new string('(', 250) + "1" + new string(')', 250)));
         Assert.Null(Ev(new string('-', 400) + "1"));
-        Assert.Null(Ev(string.Concat(Enumerable.Repeat("1^", 150)) + "1"));
+        Assert.Null(Ev(string.Concat(Enumerable.Repeat("1^", 250)) + "1"));
         Assert.Null(Ev(new string('√', 300) + "1"));
     }
 
