@@ -25,19 +25,23 @@ internal sealed class Updater : IDisposable
     private readonly DispatcherQueue _queue;
     private readonly Action<string> _notify;
     private readonly Action _beforeRestart;
+    private readonly Action _restartFailed;
     private readonly string _optOutFile;
     private readonly string _attemptFile;
     private readonly SemaphoreSlim _busy = new(1, 1);
     private Timer? _timer;
-    private VelopackAsset? _ready;
+    // set by the background check, read on the UI thread
+    private volatile VelopackAsset? _ready;
 
     /// <param name="notify">Shows a tray notification (called on the UI thread).</param>
     /// <param name="beforeRestart">Cleans up (tray icon) before Velopack exits the process to install.</param>
-    public Updater(Action<string> notify, Action beforeRestart)
+    /// <param name="restartFailed">Undoes <paramref name="beforeRestart"/> (brings the tray icon back) when the install could not start.</param>
+    public Updater(Action<string> notify, Action beforeRestart, Action restartFailed)
     {
         _queue = DispatcherQueue.GetForCurrentThread();
         _notify = notify;
         _beforeRestart = beforeRestart;
+        _restartFailed = restartFailed;
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Menew");
         _optOutFile = Path.Combine(dir, "no-auto-update");
         _attemptFile = Path.Combine(dir, "update-attempt");
@@ -101,8 +105,9 @@ internal sealed class Updater : IDisposable
     /// </summary>
     public bool ApplyPendingAtStart()
     {
-        var version = ReadyVersion;
-        if (_manager is null || _ready is null || version is null) return false;
+        var ready = _ready;
+        var version = ready?.Version?.ToString();
+        if (_manager is null || ready is null || version is null) return false;
         try
         {
             if (File.Exists(_attemptFile) && File.ReadAllText(_attemptFile) == version) return false;
@@ -111,7 +116,16 @@ internal sealed class Updater : IDisposable
         }
         catch (IOException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
-        _manager.ApplyUpdatesAndRestart(_ready);
+        try
+        {
+            _manager.ApplyUpdatesAndRestart(ready);
+        }
+        catch (Exception e)
+        {
+            // start normally; the update stays in the tray menu
+            System.Diagnostics.Debug.WriteLine($"Menew updater: {e}");
+            return false;
+        }
         return true;
     }
 
@@ -161,9 +175,20 @@ internal sealed class Updater : IDisposable
     /// <summary>Exits, installs the downloaded update and starts the new Menew (tray menu).</summary>
     public void InstallAndRestart()
     {
-        if (_manager is null || _ready is null) return;
+        var ready = _ready;
+        if (_manager is null || ready is null) return;
         _beforeRestart();
-        _manager.ApplyUpdatesAndRestart(_ready);
+        try
+        {
+            _manager.ApplyUpdatesAndRestart(ready);
+        }
+        catch (Exception e)
+        {
+            System.Diagnostics.Debug.WriteLine($"Menew updater: {e}");
+            // queued, not inline: this runs inside the (now destroyed) tray window's menu handler
+            _queue.TryEnqueue(() => _restartFailed());
+            Post(Strings.L("upd_check_failed"));
+        }
     }
 
     private void Post(string text) => _queue.TryEnqueue(() => _notify(text));

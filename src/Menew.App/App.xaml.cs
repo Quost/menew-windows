@@ -22,17 +22,25 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Languages.Current = Languages.Detect();
-        _updater = new Updater(text => _tray?.Notify("Menew", text), RemoveTrayIcon);
+        _updater = new Updater(text => _tray?.Notify("Menew", text), RemoveTrayIcon, AddTrayIcon);
         if (_updater.ApplyPendingAtStart()) return;
         _palette = new PaletteWindow();
+        AddTrayIcon();
+        LoadApps();
+        _updater.Start();
+    }
+
+    /// <summary>The tray icon and hotkey; also brings them back when an update install could not start.</summary>
+    private void AddTrayIcon()
+    {
+        if (_tray is not null || _palette is null) return;
+        var palette = _palette;
         var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "Menew.ico");
-        _tray = new TrayHost(icon, () => _palette.Toggle(), Quit, _updater);
+        _tray = new TrayHost(icon, palette.Toggle, Quit, _updater);
         if (!_tray.HotkeyRegistered)
         {
             _tray.Notify("Menew", Strings.L("hotkey_taken"));
         }
-        LoadApps();
-        _updater.Start();
     }
 
     /// <summary>A second launch of Menew.exe (Program.cs) opens the palette in this one.</summary>

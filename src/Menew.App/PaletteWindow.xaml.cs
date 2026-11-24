@@ -1,7 +1,10 @@
 using Menew.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
@@ -23,6 +26,9 @@ public sealed partial class PaletteRow(PaletteItem item)
         ItemKind.Calculator => "",
         _ => "",
     };
+
+    // the name screen readers announce for the row (UIA falls back to ToString for data items)
+    public override string ToString() => string.IsNullOrEmpty(Subtitle) ? Title : $"{Title}, {Subtitle}";
 }
 
 /// <summary>
@@ -39,6 +45,7 @@ public sealed partial class PaletteWindow : Window
     {
         InitializeComponent();
         Query.PlaceholderText = Strings.L("search_placeholder");
+        AutomationProperties.SetName(Query, Strings.L("search_placeholder"));
         ExtendsContentIntoTitleBar = true;
 
         var presenter = OverlappedPresenter.Create();
@@ -49,7 +56,7 @@ public sealed partial class PaletteWindow : Window
         presenter.SetBorderAndTitleBar(true, false);
         AppWindow.SetPresenter(presenter);
         AppWindow.IsShownInSwitchers = false;
-        AppWindow.SetIcon("Assets\\Menew.ico");
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Menew.ico"));
 
         // Alt+F4 or the system closing it only hides the palette; Quit is in the tray
         AppWindow.Closing += (_, e) =>
@@ -111,9 +118,13 @@ public sealed partial class PaletteWindow : Window
     private void UpdateFooter()
     {
         var row = Results.SelectedItem as PaletteRow;
-        Footer.Text = row is null
+        var text = row is null
             ? (Query.Text.Trim().Length > 0 ? Strings.L("nothing_found", Query.Text.Trim()) : "")
             : Strings.L(row.Item.Kind == ItemKind.Calculator ? "hint_copy" : "hint_open");
+        if (Footer.Text == text) return;
+        Footer.Text = text;
+        // the footer is a polite live region (PaletteWindow.xaml): tell screen readers it changed
+        FrameworkElementAutomationPeer.FromElement(Footer)?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     private void OnQueryChanged(object sender, TextChangedEventArgs e) => Refresh();
@@ -157,10 +168,7 @@ public sealed partial class PaletteWindow : Window
         switch (item.Kind)
         {
             case ItemKind.Calculator when item.Value is { } value:
-                var data = new DataPackage();
-                data.SetText(value);
-                Clipboard.SetContent(data);
-                Clipboard.Flush();
+                CopyToClipboard(value);
                 break;
             case ItemKind.App when item.Target is { } target:
                 try
@@ -172,6 +180,36 @@ public sealed partial class PaletteWindow : Window
                     System.Diagnostics.Debug.WriteLine($"Menew: could not open {target}: {ex.Message}");
                 }
                 break;
+        }
+    }
+
+    /// <summary>
+    /// The clipboard can be held open by another app for a moment (CLIPBRD_E_CANT_OPEN): try a few times,
+    /// then give up quietly instead of crashing.
+    /// </summary>
+    private static void CopyToClipboard(string value)
+    {
+        const int Attempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                var data = new DataPackage();
+                data.SetText(value);
+                Clipboard.SetContent(data);
+                Clipboard.Flush();
+                return;
+            }
+            catch (COMException ex) when (attempt < Attempts)
+            {
+                System.Diagnostics.Debug.WriteLine($"Menew: clipboard busy ({ex.HResult:X8}), retrying");
+                Thread.Sleep(50);
+            }
+            catch (COMException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Menew: could not copy to the clipboard: {ex.Message}");
+                return;
+            }
         }
     }
 }
